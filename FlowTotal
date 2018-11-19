@@ -1,0 +1,18 @@
+CREATE TABLE [dbo].[FlowTotal](
+	[TotalID] [int] IDENTITY(1,1) NOT FOR REPLICATION NOT NULL,
+	[FlowID] [int] NULL,
+	[Flow] [nvarchar](255) NULL,
+	[Received] [time](7) NULL,
+	[Sym] [nvarchar](6) NULL,
+	[Expiration] [nvarchar](12) NULL,
+	[Strike] [float] NULL,
+	[Ref] [float] NULL,
+	[Size] [nvarchar](20) NULL,
+	[Sentiment] [nvarchar](50) NULL,
+	[Date] [date] NULL,
+	[Spent] [bigint] NULL,
+	[OtherKey] [nvarchar](50) NULL,
+	[sector] [nvarchar](150) NULL,
+	[expirDate] [date] NULL
+) ON [PRIMARY]
+GO
