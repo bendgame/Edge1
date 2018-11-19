@@ -25,8 +25,8 @@ SELECT d.[date]
 		)
 FROM #date3 d
 
-SELECT *
-FROM #daterank3
+--SELECT *
+--FROM #daterank3
 
 CREATE TABLE #symcounts3 (
 	sentiment NVARCHAR(200)
