@@ -1,0 +1,39 @@
+CREATE PROCEDURE [dbo].[PutcallRatio] @startdate DATE
+	,@enddate DATE
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+	-- Insert statements for procedure here
+	SELECT a.Sentiment
+		,CAST(a.pcRatio AS DECIMAL(6, 4)) AS pcRatio
+	FROM (
+		SELECT CASE 
+				WHEN f.bullish > f.bearish
+					THEN 'bullish'
+				ELSE 'bearish'
+				END sentiment
+			,(cast(bearish AS FLOAT) / cast(bullish AS FLOAT)) AS pcRatio
+		FROM (
+			SELECT DISTINCT (
+					SELECT count(flow) AS bullish
+					FROM flowtotal
+					WHERE flow = 'trending_up'
+						AND [date] >= @startDate
+						AND [date] <= @enddate
+					) AS bullish
+				,(
+					SELECT count(flow) AS bearish
+					FROM flowtotal
+					WHERE flow = 'trending_down'
+						AND [date] >= @startDate
+						AND [date] <= @enddate
+					) AS bearish
+			FROM flowtotal
+			) AS f
+		) a
+END
+GO
+
