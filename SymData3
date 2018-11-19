@@ -1,0 +1,244 @@
+CREATE TABLE #date3 ([date] DATE)
+
+INSERT INTO #date3 (DATE)
+SELECT DISTINCT DATE
+FROM v_flowtotal
+ORDER BY DATE
+
+CREATE TABLE #daterank3 (
+	[date] DATE
+	,mindaterank INT
+	,maxdaterank INT
+	)
+
+INSERT INTO #daterank3 (
+	DATE
+	,mindaterank
+	,maxdaterank
+	)
+SELECT d.[date]
+	,rank() OVER (
+		ORDER BY DATE DESC
+		)
+	,rank() OVER (
+		ORDER BY DATE DESC
+		)
+FROM #date3 d
+
+SELECT *
+FROM #daterank3
+
+CREATE TABLE #symcounts3 (
+	sentiment NVARCHAR(200)
+	,sym VARCHAR(6)
+	,sector VARCHAR(200)
+	,symcount INT
+	--,symcountrank int
+	,occurrance INT
+	,uniqexpircount INT
+	--,occurrank int
+	,tspent INT
+	--,spentrank int
+	,tdays INT
+	,minstrike FLOAT
+	,maxstrike FLOAT
+	,strikedif FLOAT
+	,mindate DATE
+	,maxdate DATE
+	,betweendays INT
+	,daystotoday INT
+	)
+
+INSERT INTO #symcounts3 (
+	sentiment
+	,sym
+	,sector
+	,symcount
+	--,symcountrank
+	,occurrance
+	,uniqexpircount
+	--,occurrank
+	,tspent
+	--,spentrank 
+	,tdays
+	,minstrike
+	,maxstrike
+	,strikedif
+	,mindate
+	,maxdate
+	,betweendays
+	,daystotoday
+	)
+SELECT Sentiment
+	,Sym
+	,sector
+	,symcount
+	--,rank () over (partition by sentiment order by symcount desc, occurrance desc, tspent desc) as symcountrank
+	,occurrance
+	,uniqexpircount
+	--,rank () over (partition by sentiment order by occurrance desc, symcount desc, tspent desc) as occurrank
+	,tspent
+	--,rank () over (partition by sentiment order by tspent desc, occurrance desc) as tspentrank
+	,tdays
+	,minstrike
+	,maxstrike
+	,maxstrike - minstrike AS strikedif
+	,mindate
+	,maxdate
+	,datediff(dd, mindate, maxdate) AS betweendays
+	,datediff(dd, maxdate, convert(DATE, getdate())) AS daystotoday
+FROM (
+	SELECT Sentiment
+		,Sym
+		,sector
+		,COUNT(Sym) AS symcount
+		,COUNT(DISTINCT DATE) AS occurrance
+		,count(DISTINCT expiration) AS uniqexpircount
+		,SUM(Spent) AS tspent
+		,(
+			SELECT COUNT(DISTINCT DATE) AS tdays
+			FROM v_flowTotal
+			) AS tdays
+		,MIN(Strike) AS minstrike
+		,MAX(Strike) AS maxstrike
+		,MIN(DATE) AS mindate
+		,MAX(DATE) AS maxdate
+	FROM v_flowTotal
+	GROUP BY Sentiment
+		,Sym
+		,sector
+	) f
+
+CREATE TABLE #symdata3 (
+	sentiment NVARCHAR(20)
+	,sym VARCHAR(20)
+	,sector NVARCHAR(50)
+	,symcount INT
+	,occurrance INT
+	,uniqexpircount INT
+	,tspent INT
+	,avgspent FLOAT
+	,tdays INT
+	,minstrike FLOAT
+	,maxstrike FLOAT
+	,strikedif FLOAT
+	,mindate DATE
+	,maxdate DATE
+	,betweendays INT
+	,daystotoday INT
+	,mindaterank INT
+	,maxdaterank INT
+	,otmBets INT
+	,itmBets INT
+	,atmBets INT
+	)
+
+INSERT INTO #symdata3 (
+	sentiment
+	,sym
+	,sector
+	,symcount
+	,occurrance
+	,uniqexpircount
+	,tspent
+	,avgspent
+	,tdays
+	,minstrike
+	,maxstrike
+	,strikedif
+	,mindate
+	,maxdate
+	,betweendays
+	,daystotoday
+	,mindaterank
+	,maxdaterank
+	,otmBets
+	,itmBets
+	,atmBets
+	)
+SELECT s.sentiment
+	,s.sym
+	,s.sector
+	,s.symcount
+	,s.occurrance
+	,s.uniqexpircount
+	,s.tspent
+	,round(s.tspent / symcount, 2) AS avgspent
+	,s.tdays
+	,s.minstrike
+	,s.maxstrike
+	,s.strikedif
+	,s.mindate
+	,s.maxdate
+	,s.betweendays
+	,s.daystotoday
+	,d1.mindaterank
+	,d2.maxdaterank
+	,CASE 
+		WHEN otm.betcount IS NOT NULL
+			THEN otm.betcount
+		ELSE 0
+		END otmBets
+	,CASE 
+		WHEN itm.betcount IS NOT NULL
+			THEN itm.betcount
+		ELSE 0
+		END itmBets
+	,CASE 
+		WHEN atm.betcount IS NOT NULL
+			THEN atm.betcount
+		ELSE 0
+		END atmBets
+--,log(100) 
+FROM #symcounts3 s
+INNER JOIN #daterank3 d1 ON d1.DATE = mindate
+INNER JOIN #daterank3 d2 ON d2.DATE = maxdate
+LEFT JOIN (
+	SELECT sentiment
+		,sym
+		,chainlocation
+		,count(chainlocation) AS betcount
+		,sum(spent) AS tspent
+	FROM v_flowTotal
+	WHERE 1 = 1
+		--and [date] >= '01/01/2018'
+		AND chainlocation = 'OTM'
+	GROUP BY sentiment
+		,sym
+		,chainlocation
+	) otm ON otm.sentiment = s.sentiment
+	AND otm.sym = s.sym
+LEFT JOIN (
+	SELECT sentiment
+		,sym
+		,chainlocation
+		,count(chainlocation) AS betcount
+		,sum(spent) AS tspent
+	FROM v_flowTotal
+	WHERE 1 = 1
+		--and [date] >= '01/01/2018'
+		AND chainlocation = 'ITM'
+	GROUP BY sentiment
+		,sym
+		,chainlocation
+	) itm ON itm.sentiment = s.sentiment
+	AND itm.sym = s.sym
+LEFT JOIN (
+	SELECT sentiment
+		,sym
+		,chainlocation
+		,count(chainlocation) AS betcount
+		,sum(spent) AS tspent
+	FROM v_flowTotal
+	WHERE 1 = 1
+		--and [date] >= '01/01/2018'
+		AND chainlocation = 'ATM'
+	GROUP BY sentiment
+		,sym
+		,chainlocation
+	) atm ON atm.sentiment = s.sentiment
+	AND atm.sym = s.sym
+ORDER BY sentiment
+	,sym
+	,occurrance DESC
+
